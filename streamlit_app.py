@@ -4,106 +4,88 @@ import numpy as np
 import time
 from datetime import datetime
 
-# --- PAGE CONFIGURATION ---
+# --- MOBILE-FIRST CONFIG ---
 st.set_page_config(
-    page_title="Stäubli TX2-90 Mission Control",
+    page_title="Robot Monitor",
     page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="centered", # Better for mobile/small screens
 )
 
-# --- CUSTOM CSS FOR INDUSTRIAL LOOK ---
+# --- INJECTION OF MOBILE CSS ---
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    div[data-testid="stMetricValue"] { font-size: 48px; color: #f1c40f; }
-    div[data-testid="stMetricDelta"] { font-size: 20px; }
-    .status-box {
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px solid #333;
+    /* Force metrics to be larger and centered */
+    [data-testid="stMetricValue"] { font-size: 3rem !important; color: #f1c40f; }
+    
+    /* Optimize buttons for touch */
+    .stButton > button {
+        width: 100%;
+        height: 60px;
+        font-size: 20px !important;
+        border-radius: 12px;
+        margin-bottom: 10px;
+    }
+    
+    /* Clean up padding for small screens */
+    .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+    
+    .status-card {
+        padding: 15px;
+        border-radius: 12px;
         background-color: #1a1c24;
+        border: 1px solid #333;
         text-align: center;
+        margin-bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOCK DATA GENERATOR ---
-# In production, replace these with requests.get() calls to the Stäubli/Apera APIs
+# --- MOCK DATA ---
 def get_telemetry():
     return {
-        "cycle_rate": round(np.random.uniform(12.8, 14.2), 1),
-        "confidence": np.random.randint(88, 99),
-        "pick_count": 1242,
-        "magnet_temp": 42,
-        "vision_latency": 142,
+        "cycle_rate": round(np.random.uniform(12.8, 14.5), 1),
+        "confidence": np.random.randint(85, 99),
+        "picks": 1242,
         "status": "NOMINAL"
     }
 
-# --- HEADER ---
-col_h1, col_h2 = st.columns([3, 1])
-with col_h1:
-    st.title("🚜 Truck-Bed Robot Monitor")
-    st.caption(f"System Active | Session Started: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-with col_h2:
-    if st.button("🚩 FLAG PICK ERROR", use_container_width=True):
-        st.toast("Error Event Logged for Analysis", icon="💾")
+# --- STATIC HEADER & ACTION BUTTONS ---
+st.title("🚜 Robot Live")
 
-st.divider()
+# Big Action Button at the top for easy access
+if st.button("🚩 FLAG PICK ERROR", type="primary"):
+    st.toast("Error Logged!", icon="💾")
 
-# --- MAIN DASHBOARD LAYOUT ---
-# We use an empty container to refresh the data every second
+# --- REFRESHING DATA AREA ---
 placeholder = st.empty()
 
+# This loop stays stable because the buttons are OUTSIDE of it.
 while True:
     data = get_telemetry()
     
     with placeholder.container():
-        # ROW 1: MISSION CRITICAL METRICS
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Picks / Min", f"{data['cycle_rate']}", delta="Target: 15.0")
-        m2.metric("AI Confidence", f"{data['confidence']}%", delta="High")
-        m3.metric("Total Picks", f"{data['pick_count']:,}")
-        m4.metric("Vision Latency", f"{data['vision_latency']}ms", delta="-12ms")
+        # Status Card
+        st.markdown(f"""
+            <div class="status-card">
+                <span style="color: #888; font-size: 14px;">SYSTEM STATUS</span><br>
+                <b style="color: #2ecc71; font-size: 24px;">● {data['status']}</b>
+            </div>
+        """, unsafe_allow_html=True)
 
-        st.write("###") # Vertical Spacing
+        # Main Metrics (Stacked for Mobile)
+        m1, m2 = st.columns(2)
+        m1.metric("Picks/Min", data['cycle_rate'], delta="+0.2")
+        m2.metric("AI Conf.", f"{data['confidence']}%")
 
-        # ROW 2: SYSTEM HEALTH & LIVE TELEMETRY
-        col_left, col_right = st.columns([2, 1])
+        # Trend Chart (Simplified for mobile)
+        st.write("### Throughput Trend")
+        chart_data = pd.DataFrame(np.random.randn(15, 1) + 13.5, columns=['TPM'])
+        st.line_chart(chart_data, color="#f1c40f", height=180)
 
-        with col_left:
-            st.subheader("📊 Production Trend (Last 60s)")
-            # Simulating a trend line for throughput
-            chart_data = pd.DataFrame(
-                np.random.randn(20, 1) + 13.5,
-                columns=['Ties/Min']
-            )
-            st.line_chart(chart_data, color="#f1c40f", height=250)
+        # Secondary Info
+        st.write("---")
+        c1, c2 = st.columns(2)
+        c1.write(f"**Total Picks:** {data['picks']}")
+        c2.write(f"**Updated:** {datetime.now().strftime('%H:%M:%S')}")
 
-        with col_right:
-            st.subheader("🔧 System Triage")
-            
-            # Status Indicator Display
-            st.markdown(f"""
-                <div class="status-box">
-                    <p style="color: #888; margin-bottom: 5px;">CONTROLLER STATE</p>
-                    <h2 style="color: #2ecc71; margin: 0;">{data['status']}</h2>
-                    <hr style="border-color: #333;">
-                    <p style="color: #888; margin-top: 10px;">SUBSYSTEMS</p>
-                    <div style="text-align: left; padding-left: 20%;">
-                        🟢 Stäubli CS9 Link<br>
-                        🟢 Apera Vue Edge<br>
-                        🟢 Imperx Cam 01
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.write("###")
-            if st.button("🔄 Reset Cycle Timer", use_container_width=True):
-                pass
-
-        # FOOTER / LOGS
-        with st.expander("View Raw Telemetry Stream"):
-            st.write(data)
-
-    time.sleep(1) # Refresh rate
+    time.sleep(1)
