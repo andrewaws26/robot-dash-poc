@@ -4,38 +4,66 @@ import numpy as np
 import time
 from datetime import datetime
 
-# --- MOBILE-FIRST CONFIG ---
+# --- KIOSK CONFIGURATION ---
 st.set_page_config(
-    page_title="Robot Monitor",
-    page_icon="🤖",
-    layout="centered", # Better for mobile/small screens
+    page_title="Robot Operations",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-# --- INJECTION OF MOBILE CSS ---
+# --- INJECTING INDUSTRIAL KIOSK CSS ---
 st.markdown("""
     <style>
-    /* Force metrics to be larger and centered */
-    [data-testid="stMetricValue"] { font-size: 3rem !important; color: #f1c40f; }
-    
-    /* Optimize buttons for touch */
+    /* 1. Eliminate Scroll & Force Viewport */
+    html, body, [data-testid="stAppViewContainer"] {
+        overflow: hidden;
+        height: 100vh;
+    }
+
+    /* 2. iPhone Dynamic Island / Safe Area Padding */
+    .block-container {
+        padding-top: 65px !important; 
+        padding-bottom: 20px !important;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* 3. Industrial Typography */
+    [data-testid="stMetricValue"] { 
+        font-size: 3.2rem !important; 
+        font-weight: 800; 
+        color: #f1c40f; 
+        line-height: 1;
+    }
+    [data-testid="stMetricLabel"] { 
+        font-size: 0.9rem !important; 
+        text-transform: uppercase; 
+        letter-spacing: 2px;
+        color: #888;
+    }
+
+    /* 4. Kiosk-Style Button */
     .stButton > button {
         width: 100%;
-        height: 60px;
-        font-size: 20px !important;
-        border-radius: 12px;
-        margin-bottom: 10px;
+        height: 80px;
+        background-color: #c0392b !important;
+        color: white !important;
+        font-weight: 900 !important;
+        font-size: 24px !important;
+        border-radius: 0px; /* Sharp industrial corners */
+        border: 2px solid #7f231c;
+        text-transform: uppercase;
     }
-    
-    /* Clean up padding for small screens */
-    .block-container { padding-top: 1rem; padding-bottom: 1rem; }
-    
+
+    /* 5. Status Card Styling */
     .status-card {
+        background-color: #111;
         padding: 15px;
-        border-radius: 12px;
-        background-color: #1a1c24;
         border: 1px solid #333;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -43,49 +71,42 @@ st.markdown("""
 # --- MOCK DATA ---
 def get_telemetry():
     return {
-        "cycle_rate": round(np.random.uniform(12.8, 14.5), 1),
-        "confidence": np.random.randint(85, 99),
-        "picks": 1242,
-        "status": "NOMINAL"
+        "tpm": round(np.random.uniform(13.1, 14.5), 1),
+        "conf": np.random.randint(91, 98),
+        "status": "SYSTEM NOMINAL"
     }
 
-# --- STATIC HEADER & ACTION BUTTONS ---
-st.title("🚜 Robot Live")
+# --- KIOSK UI FLOW ---
 
-# Big Action Button at the top for easy access
-if st.button("🚩 FLAG PICK ERROR", type="primary"):
-    st.toast("Error Logged!", icon="💾")
+# Header (Static)
+st.markdown(f'<div class="status-card"><span style="color: #444; font-size: 12px; letter-spacing: 2px;">CONNECTION: {get_telemetry()["status"]}</span></div>', unsafe_allow_html=True)
 
-# --- REFRESHING DATA AREA ---
+# Main Action (Static)
+if st.button("REPORT PICK FAILURE"):
+    st.toast("EVENT LOGGED", icon="💾")
+
+# Refreshing Section
 placeholder = st.empty()
 
-# This loop stays stable because the buttons are OUTSIDE of it.
 while True:
     data = get_telemetry()
-    
     with placeholder.container():
-        # Status Card
+        
+        # Primary Metrics (Two columns, no vertical waste)
+        m1, m2 = st.columns(2)
+        m1.metric("TIES / MIN", data['tpm'])
+        m2.metric("AI CONFIDENCE", f"{data['conf']}%")
+
+        # Trend Chart (Height constrained to prevent scrolling)
+        chart_data = pd.DataFrame(np.random.randn(15, 1) + 13.5, columns=['TPM'])
+        st.line_chart(chart_data, color="#f1c40f", height=220)
+
+        # Bottom Status (Small and out of the way)
         st.markdown(f"""
-            <div class="status-card">
-                <span style="color: #888; font-size: 14px;">SYSTEM STATUS</span><br>
-                <b style="color: #2ecc71; font-size: 24px;">● {data['status']}</b>
+            <div style="display: flex; justify-content: space-between; color: #444; font-size: 10px; font-family: monospace; border-top: 1px solid #222; padding-top: 10px;">
+                <span>STAUBLI TX2-90 CONTROL</span>
+                <span>SYNC: {datetime.now().strftime('%H:%M:%S')}</span>
             </div>
         """, unsafe_allow_html=True)
-
-        # Main Metrics (Stacked for Mobile)
-        m1, m2 = st.columns(2)
-        m1.metric("Picks/Min", data['cycle_rate'], delta="+0.2")
-        m2.metric("AI Conf.", f"{data['confidence']}%")
-
-        # Trend Chart (Simplified for mobile)
-        st.write("### Throughput Trend")
-        chart_data = pd.DataFrame(np.random.randn(15, 1) + 13.5, columns=['TPM'])
-        st.line_chart(chart_data, color="#f1c40f", height=180)
-
-        # Secondary Info
-        st.write("---")
-        c1, c2 = st.columns(2)
-        c1.write(f"**Total Picks:** {data['picks']}")
-        c2.write(f"**Updated:** {datetime.now().strftime('%H:%M:%S')}")
 
     time.sleep(1)
