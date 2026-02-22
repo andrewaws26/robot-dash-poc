@@ -11,90 +11,80 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# --- THE KIOSK "LOCK" CSS ---
+# --- THE "NO-GHOSTING" KIOSK CSS ---
 st.markdown("""
     <style>
-    /* 1. Nuke the ability to scroll anywhere */
+    /* Force height and hide scrollbars */
     html, body, [data-testid="stAppViewContainer"], .main {
         overflow: hidden !important;
         height: 100vh !important;
         position: fixed;
         width: 100%;
+        background-color: #000;
     }
 
-    /* 2. Remove Streamlit's default padding/header */
-    [data-testid="stHeader"] { display: none; }
+    /* iPhone Island / Safe Area */
     .block-container {
-        padding-top: 55px !important; /* iPhone Island Clear */
-        padding-bottom: 0 !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding-top: 60px !important;
         max-width: 100% !important;
     }
 
-    /* 3. Scale text for Dash visibility */
-    [data-testid="stMetricValue"] { font-size: 2.8rem !important; color: #f1c40f; font-weight: 800; }
-    [data-testid="stMetricLabel"] { font-size: 0.8rem !important; letter-spacing: 2px; }
+    [data-testid="stMetricValue"] { font-size: 3.2rem !important; color: #f1c40f; font-weight: 800; }
+    [data-testid="stMetricLabel"] { font-size: 0.8rem !important; color: #666; letter-spacing: 2px; }
 
-    /* 4. Industrial Button Style */
     .stButton > button {
         width: 100%;
-        height: 65px;
+        height: 70px;
         background-color: #c0392b !important;
         color: white !important;
         font-weight: 900 !important;
-        font-size: 18px !important;
-        border-radius: 4px;
+        font-size: 20px !important;
         border: none;
         text-transform: uppercase;
-    }
-
-    /* 5. Status strip */
-    .status-strip {
-        background-color: #111;
-        padding: 8px;
-        border: 1px solid #222;
-        text-align: center;
-        color: #555;
-        font-size: 10px;
-        letter-spacing: 1px;
-        margin-bottom: 10px;
+        margin-bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- APP CONTENT ---
+# --- STATIC TOP SECTION ---
+st.markdown('<div style="color: #333; font-size: 10px; text-align: center; letter-spacing: 2px;">V-SYSTEM LIVE FEED</div>', unsafe_allow_html=True)
 
-# Connection Bar
-st.markdown('<div class="status-strip">STAUBLI CS9: CONNECTED</div>', unsafe_allow_html=True)
-
-# Action Button
-if st.button("REPORT PICK FAILURE"):
+# Putting the button in a container ensures it doesn't shift
+if st.button("REPORT PICK FAILURE", key="main_report_btn"):
     st.toast("EVENT LOGGED")
 
-# Live Data Region
+# --- DYNAMIC DATA SECTION ---
+# This "placeholder" is the key to preventing duplicates. 
+# Everything inside this container is wiped and replaced every second.
 placeholder = st.empty()
 
+# Initialization for mock trend
+if 'data_history' not in st.session_state:
+    st.session_state.data_history = [13.5] * 15
+
 while True:
-    tpm = round(np.random.uniform(13.1, 14.5), 1)
+    # 1. Update Mock Data
+    new_val = round(np.random.uniform(13.1, 14.5), 1)
+    st.session_state.data_history.append(new_val)
+    st.session_state.data_history = st.session_state.data_history[-15:]
     conf = np.random.randint(91, 98)
     
+    # 2. Render inside the placeholder
     with placeholder.container():
-        # Metrics Grid
         m1, m2 = st.columns(2)
-        m1.metric("TIES / MIN", tpm)
+        m1.metric("TIES / MIN", new_val)
         m2.metric("AI CONF", f"{conf}%")
 
-        # Compact Chart (Set specifically to 180 to prevent overflow)
-        chart_data = pd.DataFrame(np.random.randn(15, 1) + 13.5, columns=['TPM'])
-        st.line_chart(chart_data, color="#f1c40f", height=180)
+        # Create a clean chart using the history
+        chart_df = pd.DataFrame(st.session_state.data_history, columns=['TPM'])
+        st.line_chart(chart_df, color="#f1c40f", height=200)
 
-        # Bottom Footer
         st.markdown(f"""
             <div style="display: flex; justify-content: space-between; color: #333; font-size: 9px; margin-top: 10px; font-family: monospace;">
-                <span>V-SYSTEM 1.0</span>
-                <span>{datetime.now().strftime('%H:%M:%S')}</span>
+                <span>UNIT-TX2-90</span>
+                <span>SYNC: {datetime.now().strftime('%H:%M:%S')}</span>
             </div>
         """, unsafe_allow_html=True)
 
+    # 3. Controlled Sleep
     time.sleep(1)
